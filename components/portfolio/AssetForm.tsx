@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PortfolioAsset, StockAsset, MutualFundAsset, AssetType, AssetSearchResult } from '../../types';
@@ -168,7 +167,7 @@ const AssetForm: React.FC<AssetFormProps> = ({ isOpen, onClose, onSave, assetToE
                                     
                                     <div>
                                         <label className="text-xs text-text-secondary-light dark:text-text-secondary-dark">Ticker / Scheme Code</label>
-                                        <input type="text" name="id" value={formData.id || ''} onChange={handleChange} className="w-full mt-1 p-2 rounded-md bg-slate-200 dark:bg-slate-900 focus:outline-none cursor-not-allowed" readOnly />
+                                        <input type="text" name="id" value={formData.id || ''} onChange={handleChange} placeholder="e.g., RELIANCE or 120530" className="w-full mt-1 p-2 rounded-md bg-slate-100 dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-light dark:focus:ring-primary-dark" required />
                                     </div>
                                     
                                     <div className="grid grid-cols-2 gap-4">

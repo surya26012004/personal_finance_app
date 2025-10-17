@@ -1,4 +1,3 @@
-
 import type {
     AssetDetails,
     AssetSearchResult,
@@ -11,16 +10,18 @@ import type {
 } from '../types';
 
 // ===================================================================================
-// LIVE DATA INTEGRATION - ACTION REQUIRED
+// UPSTOX API INTEGRATION - ACTION REQUIRED
 // ===================================================================================
-// 1. Go to finnhub.io, sign up for a free account, and get your API key.
-// 2. Paste your API key below to enable live stock market data.
+// 1. Go to https://upstox.com/developer/, create an app, and get your API key and secret.
+// 2. You need to generate an access token. This is typically done via an OAuth2 flow.
+//    For development, you can generate one manually using their tools or a simple script.
+// 3. Paste your access token below to enable live market data.
 // ===================================================================================
 
-const FINNHUB_API_KEY = 'd3p7johr01qt2em62i90d3p7johr01qt2em62i9g'; // <-- PASTE YOUR KEY HERE
-const FINNHUB_API_BASE_URL = 'https://finnhub.io/api/v1';
+const UPSTOX_ACCESS_TOKEN = '41bb896b-eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI2UUI3U1kiLCJqdGkiOiI2OGYyODg2YTkyYzczNjU4M2YyMjY5NGEiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6dHJ1ZSwiaWF0IjoxNzYwNzI1MDk4LCJpc3MiOiJ1ZGFwaS1nYXRld2F5LXNlcnZpY2UiLCJleHAiOjE3NjA3Mzg0MDB9.NC8DcREchHCpkbkrR1bhiqb68LSmEb9Z8DMWPJdZGmM-4fa6-b77b-1bcd6c8adcf0'; // <-- PASTE YOUR GENERATED ACCESS TOKEN HERE
+const UPSTOX_API_BASE_URL = 'https://api.upstox.com/v2';
+const USE_MOCK_DATA = !UPSTOX_ACCESS_TOKEN;
 
-const MF_API_BASE_URL = 'https://api.mfapi.in'; // Real Free Mutual Fund API
 
 // --- Helper to generate mock chart data for details view ---
 const generateMockChartData = (base: number) => {
@@ -38,162 +39,151 @@ const generateMockChartData = (base: number) => {
 
 // --- MOCK DATA (For Fallback) ---
 
-const MOCK_ASSETS: Record<string, (StockDetails | MutualFundDetails) & { id: string; name: string; type: AssetType; }> = {
-    'RELIANCE': { id: 'RELIANCE', name: 'Reliance Industries Ltd', type: 'STOCK', marketCap: 20000000000000, peRatio: 28.5, week52High: 3024, week52Low: 2220, sector: 'Energy' },
-    'HDFCBANK': { id: 'HDFCBANK', name: 'HDFC Bank Ltd', type: 'STOCK', marketCap: 12000000000000, peRatio: 20.1, week52High: 1757, week52Low: 1363, sector: 'Financials' },
-    'TCS': { id: 'TCS', name: 'Tata Consultancy Services Ltd', type: 'STOCK', marketCap: 14000000000000, peRatio: 32.8, week52High: 4254, week52Low: 3070, sector: 'IT' },
-    '120530': { id: '120530', name: 'Parag Parikh Flexi Cap Fund', type: 'MUTUAL_FUND', aum: 66000, expenseRatio: 0.65, nav: 76.5, category: 'Equity' },
-    '119554': { id: '119554', name: 'Axis Bluechip Fund', type: 'MUTUAL_FUND', aum: 32000, expenseRatio: 0.55, nav: 57.2, category: 'Equity' },
+const MOCK_ASSETS: Record<string, (Partial<StockDetails> | Partial<MutualFundDetails>) & { id: string; name: string; type: AssetType; }> = {
+    'NSE_EQ|INE002A01018': { id: 'NSE_EQ|INE002A01018', name: 'Reliance Industries Ltd', type: 'STOCK', week52High: 3024, week52Low: 2220, sector: 'Energy' },
+    'NSE_EQ|INE040A01034': { id: 'NSE_EQ|INE040A01034', name: 'HDFC Bank Ltd', type: 'STOCK', week52High: 1757, week52Low: 1363, sector: 'Financials' },
+    'NSE_EQ|INE467B01029': { id: 'NSE_EQ|INE467B01029', name: 'Tata Consultancy Services Ltd', type: 'STOCK', week52High: 4254, week52Low: 3070, sector: 'IT' },
+    'MF_FO|120530': { id: 'MF_FO|120530', name: 'Parag Parikh Flexi Cap Fund', type: 'MUTUAL_FUND', nav: 76.5, category: 'Equity' },
+    'MF_FO|119554': { id: 'MF_FO|119554', name: 'Axis Bluechip Fund', type: 'MUTUAL_FUND', nav: 57.2, category: 'Equity' },
 };
 
 const MOCK_MARKET_DATA: Record<string, MarketData> = {
-    'RELIANCE': { currentPrice: 2950.75, dayChange: 25.40, dayChangePercent: 0.87 },
-    'HDFCBANK': { currentPrice: 1680.20, dayChange: -10.15, dayChangePercent: -0.60 },
-    'TCS': { currentPrice: 3850.00, dayChange: 42.10, dayChangePercent: 1.11 },
-    '120530': { currentPrice: 76.5, dayChange: 0.35, dayChangePercent: 0.46 },
-    '119554': { currentPrice: 57.2, dayChange: -0.12, dayChangePercent: -0.21 },
+    'NSE_EQ|INE002A01018': { currentPrice: 2950.75, dayChange: 25.40, dayChangePercent: 0.87 },
+    'NSE_EQ|INE040A01034': { currentPrice: 1680.20, dayChange: -10.15, dayChangePercent: -0.60 },
+    'NSE_EQ|INE467B01029': { currentPrice: 3850.00, dayChange: 42.10, dayChangePercent: 1.11 },
+    'MF_FO|120530': { currentPrice: 76.5, dayChange: 0.35, dayChangePercent: 0.46 },
+    'MF_FO|119554': { currentPrice: 57.2, dayChange: -0.12, dayChangePercent: -0.21 },
 };
 
+const commonApiHeaders = {
+    'Accept': 'application/json',
+    'Authorization': `Bearer ${UPSTOX_ACCESS_TOKEN}`
+};
 
 // --- API Functions ---
 
 /**
- * Fetches real-time market data for a list of assets from their respective APIs.
+ * Fetches real-time market data for a list of assets from Upstox.
  */
 export const getMarketData = async (assets: (PortfolioAsset | WatchlistItem)[]): Promise<Record<string, MarketData>> => {
-    const useMock = FINNHUB_API_KEY.startsWith('YOUR_');
-    if (useMock || assets.length === 0) {
-        if (!useMock) console.warn("Finnhub API Key not set. Falling back to MOCK market data.");
+    if (USE_MOCK_DATA || assets.length === 0) {
+        if (USE_MOCK_DATA && assets.length > 0) {
+            console.warn("Using MOCK market data. Set your Upstox Access Token for live data.");
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        if (assets.length === 0) return {};
         const assetIds = assets.map(a => a.id);
         return Object.fromEntries(Object.entries(MOCK_MARKET_DATA).filter(([key]) => assetIds.includes(key)));
     }
 
-    const results: Record<string, MarketData> = {};
+    const instrumentKeys = assets.map(a => a.id).join(',');
+    try {
+        const endpoint = `${UPSTOX_API_BASE_URL}/market-quote/quotes?instrument_key=${instrumentKeys}`;
+        const response = await fetch(endpoint, { headers: commonApiHeaders });
+        if (!response.ok) throw new Error(`Upstox API Error: ${response.statusText}`);
+        
+        const jsonResponse = await response.json();
+        const data = jsonResponse.data;
 
-    const apiCalls = assets.map(async (asset) => {
-        try {
-            if (asset.type === 'STOCK') {
-                const ticker = `${asset.id}.NS`; // Append .NS for NSE stocks
-                const endpoint = `${FINNHUB_API_BASE_URL}/quote?symbol=${ticker}&token=${FINNHUB_API_KEY}`;
-                const response = await fetch(endpoint);
-                const data = await response.json();
-                if (data.c) { // 'c' is current price in Finnhub response
-                    results[asset.id] = {
-                        currentPrice: data.c,
-                        dayChange: data.d,
-                        dayChangePercent: data.dp,
-                    };
-                }
-            } else if (asset.type === 'MUTUAL_FUND') {
-                const endpoint = `${MF_API_BASE_URL}/mf/${asset.id}`;
-                const response = await fetch(endpoint);
-                const data = await response.json();
-                const todayNav = parseFloat(data.data[0].nav);
-                const yesterdayNav = parseFloat(data.data[1].nav);
-                const dayChange = todayNav - yesterdayNav;
-                const dayChangePercent = (dayChange / yesterdayNav) * 100;
-                results[asset.id] = {
-                    currentPrice: todayNav,
-                    dayChange: dayChange,
-                    dayChangePercent: dayChangePercent
-                };
-            }
-        } catch (error) {
-            console.error(`Failed to fetch data for ${asset.id}:`, error);
-            // Fallback to mock data for the failed asset
-            if (MOCK_MARKET_DATA[asset.id]) {
-                results[asset.id] = MOCK_MARKET_DATA[asset.id];
-            }
+        const results: Record<string, MarketData> = {};
+        for (const key in data) {
+            const quote = data[key];
+            results[key] = {
+                currentPrice: quote.last_price,
+                dayChange: quote.change,
+                dayChangePercent: quote.net_change, // In Upstox API, net_change is percentage
+            };
         }
-    });
-
-    await Promise.all(apiCalls);
-    return results;
+        return results;
+    } catch (error) {
+        console.error(`Failed to fetch market data from Upstox:`, error);
+        return {}; // Return empty on error
+    }
 };
 
 /**
- * Fetches detailed information for a single asset.
+ * Fetches detailed information for a single asset from Upstox.
  */
 export const getAssetDetails = async (assetId: string, assetType: AssetType): Promise<AssetDetails | null> => {
-    const useMock = FINNHUB_API_KEY.startsWith('YOUR_');
-    if (useMock) {
-        console.warn(`API Key not set. Falling back to MOCK asset details for ${assetId}.`);
+     if (USE_MOCK_DATA) {
+        console.warn(`Using MOCK asset details for ${assetId}.`);
+        await new Promise(resolve => setTimeout(resolve, 500));
         const assetInfo = MOCK_ASSETS[assetId];
         if (!assetInfo) return null;
 
         const marketData = MOCK_MARKET_DATA[assetId];
         const basePrice = marketData ? marketData.currentPrice : 1000;
 
-        return { ...assetInfo, chartData: generateMockChartData(basePrice) } as AssetDetails;
+        return { 
+            ...assetInfo,
+            marketCap: 0,
+            peRatio: 0,
+            aum: 0,
+            expenseRatio: 0,
+            chartData: generateMockChartData(basePrice) 
+        } as AssetDetails;
     }
 
     try {
-        let details: Partial<AssetDetails>;
-        if (assetType === 'STOCK') {
-            // NOTE: Finnhub free tier does not provide deep fundamentals like P/E, MarketCap.
-            // We will fetch what we can and use mock data for the rest to keep UI consistent.
-            const ticker = `${assetId}.NS`;
-            const profileEndpoint = `${FINNHUB_API_BASE_URL}/stock/profile2?symbol=${ticker}&token=${FINNHUB_API_KEY}`;
-            const profileRes = await fetch(profileEndpoint);
-            const profileData = await profileRes.json();
-            
-            // For chart data, we'll use mock generator as historical data can be complex.
-            const basePrice = MOCK_MARKET_DATA[assetId]?.currentPrice || profileData.shareOutstanding * profileData.marketCapitalization || 1000;
-            // FIX: The type of mockDetails needs to include the `name` property, which is present in MOCK_ASSETS but not in the base StockDetails type.
-            const mockDetails = MOCK_ASSETS[assetId] as StockDetails & { name: string };
+        const toDate = new Date().toISOString().split('T')[0];
+        const fromDate = new Date(new Date().setFullYear(new Date().getFullYear() - 5)).toISOString().split('T')[0];
 
-            details = {
-                id: assetId,
-                name: profileData.name || mockDetails.name,
-                type: 'STOCK',
-                marketCap: profileData.marketCapitalization * 1000000 || mockDetails.marketCap, // Convert from millions
-                sector: profileData.finnhubIndustry || mockDetails.sector,
-                peRatio: mockDetails.peRatio, // Not in free tier
-                week52High: mockDetails.week52High, // Not in free tier
-                week52Low: mockDetails.week52Low,   // Not in free tier
-                chartData: generateMockChartData(basePrice) // Using a placeholder
-            };
+        const historyPromise = fetch(`${UPSTOX_API_BASE_URL}/historical-candle/${assetId}/day/${toDate}/${fromDate}`, { headers: commonApiHeaders }).then(r => r.json());
+        const ohlcPromise = fetch(`${UPSTOX_API_BASE_URL}/market-quote/ohlc?instrument_key=${assetId}`, { headers: commonApiHeaders }).then(r => r.json());
+        // We need to get the name from somewhere. Search is one way.
+        const searchPromise = fetch(`${UPSTOX_API_BASE_URL}/search/instruments?query=${assetId.split('|')[1]}`, { headers: commonApiHeaders }).then(r => r.json());
 
-        } else { // MUTUAL_FUND
-            const detailsEndpoint = `${MF_API_BASE_URL}/mf/${assetId}`;
-            const detailsResponse = await fetch(detailsEndpoint);
-            const detailsData = await detailsResponse.json();
-            
-            // Take the last 5 years of NAV data for the chart
-            const chartPoints = detailsData.data.slice(0, 365 * 5).reverse();
-            const chartData = {
-                '1M': chartPoints.slice(-30).map((d: any) => ({ date: d.date, value: parseFloat(d.nav) })),
-                '6M': chartPoints.slice(-180).map((d: any) => ({ date: d.date, value: parseFloat(d.nav) })),
-                '1Y': chartPoints.slice(-365).map((d: any) => ({ date: d.date, value: parseFloat(d.nav) })),
-                '5Y': chartPoints.map((d: any) => ({ date: d.date, value: parseFloat(d.nav) })),
-            };
-
-            details = {
-                id: assetId,
-                name: detailsData.meta.scheme_name,
-                type: 'MUTUAL_FUND',
-                nav: parseFloat(detailsData.data[0].nav),
-                category: detailsData.meta.scheme_category as any,
-                aum: 0, // AUM not provided by this API
-                expenseRatio: 0, // Expense ratio not provided
-                chartData,
-            }
+        const [historyResponse, ohlcResponse, searchResponse] = await Promise.all([historyPromise, ohlcPromise, searchPromise]);
+        
+        if (historyResponse.status !== 'success' || ohlcResponse.status !== 'success' || searchResponse.status !== 'success') {
+            throw new Error('One or more Upstox detail APIs failed');
         }
+
+        const chartPoints = historyResponse.data.candles.map((c: any) => ({
+            date: c[0].split('T')[0],
+            value: c[4] // Closing price
+        })).reverse();
+        
+        const ohlcData = ohlcResponse.data[assetId];
+        const instrumentData = searchResponse.data.find((d: any) => d.instrument_key === assetId);
+
+        let details: Partial<AssetDetails> = {
+            id: assetId,
+            name: instrumentData?.name || instrumentData?.tradingsymbol || 'Unknown Asset',
+            type: assetType,
+            week52High: ohlcData?.ohlc?.['52w_h'] || 0,
+            week52Low: ohlcData?.ohlc?.['52w_l'] || 0,
+            chartData: {
+                '1M': chartPoints.slice(-22),
+                '6M': chartPoints.slice(-132),
+                '1Y': chartPoints.slice(-252),
+                '5Y': chartPoints,
+            },
+        };
+
+        if (assetType === 'STOCK') {
+            details = { ...details, sector: 'N/A', marketCap: 0, peRatio: 0 } as Partial<StockDetails>;
+        } else {
+             details = { ...details, category: (instrumentData?.instrument_type || 'Other') as any, nav: ohlcData.last_price, aum: 0, expenseRatio: 0 } as Partial<MutualFundDetails>;
+        }
+
         return details as AssetDetails;
+
     } catch (error) {
-        console.error(`Failed to fetch details for ${assetId}:`, error);
+        console.error(`Failed to fetch details for ${assetId} from Upstox:`, error);
         return null;
     }
 };
 
 /**
- * Searches for assets based on a query string from live APIs.
+ * Searches for assets based on a query string from Upstox.
  */
 export const searchAssets = async (query: string): Promise<AssetSearchResult[]> => {
     if (!query) return [];
     
-    const useMock = FINNHUB_API_KEY.startsWith('YOUR_');
-     if (useMock) {
+    if (USE_MOCK_DATA) {
+        console.warn(`Using MOCK asset search.`);
+        await new Promise(resolve => setTimeout(resolve, 500));
         return Object.values(MOCK_ASSETS)
             .filter(asset => 
                 asset.name.toLowerCase().includes(query.toLowerCase()) || 
@@ -201,37 +191,27 @@ export const searchAssets = async (query: string): Promise<AssetSearchResult[]> 
             )
             .map(asset => ({ id: asset.id, name: asset.name, type: asset.type }));
     }
-
-    const stockPromise = fetch(`${FINNHUB_API_BASE_URL}/search?q=${query}&token=${FINNHUB_API_KEY}`).then(res => res.json());
-    const mfPromise = fetch(`${MF_API_BASE_URL}/mf/search?q=${query}`).then(res => res.ok ? res.json() : []);
-
-    const [stockResult, mfResult] = await Promise.allSettled([stockPromise, mfPromise]);
     
-    const combinedResults: AssetSearchResult[] = [];
+    try {
+        const endpoint = `${UPSTOX_API_BASE_URL}/search/instruments?query=${encodeURIComponent(query)}`;
+        const response = await fetch(endpoint, { headers: commonApiHeaders });
+        if (!response.ok) throw new Error(`Upstox Search API Error: ${response.statusText}`);
 
-    if (stockResult.status === 'fulfilled' && stockResult.value.result) {
-        const stockData = stockResult.value.result
-            .filter((item: any) => item.symbol.includes('.NS'))
+        const jsonResponse = await response.json();
+        
+        return jsonResponse.data
+            .filter((item: any) => 
+                (item.exchange === 'NSE' && item.instrument_type === 'EQUITY') || 
+                (item.exchange === 'MF_FO' && item.instrument_type === 'MUTUALFUND')
+            )
             .map((item: any) => ({
-                id: item.symbol.replace('.NS', ''),
-                name: item.description,
-                type: 'STOCK' as AssetType,
+                id: item.instrument_key,
+                name: item.tradingsymbol,
+                type: item.instrument_type === 'EQUITY' ? 'STOCK' : 'MUTUAL_FUND'
             }));
-        combinedResults.push(...stockData);
-    } else if (stockResult.status === 'rejected') {
-        console.error('Stock search failed:', stockResult.reason);
-    }
 
-    if (mfResult.status === 'fulfilled' && Array.isArray(mfResult.value)) {
-        const mfData = mfResult.value.map((item: any) => ({
-            id: item.schemeCode.toString(),
-            name: item.schemeName,
-            type: 'MUTUAL_FUND' as AssetType,
-        }));
-        combinedResults.push(...mfData);
-    } else if (mfResult.status === 'rejected') {
-        console.error('Mutual fund search failed:', mfResult.reason);
+    } catch(error) {
+        console.error('Failed to search assets on Upstox:', error);
+        return [];
     }
-
-    return combinedResults.slice(0, 10);
 };
