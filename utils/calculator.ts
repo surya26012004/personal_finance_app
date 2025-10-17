@@ -1,4 +1,4 @@
-import type { FdInput, FdResult, SipInput, SipResult, StepSipInput, SwpInput, SwpResult, LumpsumSipInput } from '../types';
+import type { FdInput, FdResult, SipInput, SipResult, StepSipInput, SwpInput, SwpResult, LumpsumSipInput, EmiInput, EmiResult, AmortizationData } from '../types';
 
 export const calculateFd = (input: FdInput): FdResult => {
     const { principal, rate, years } = input;
@@ -119,4 +119,47 @@ export const calculateSwp = (input: SwpInput): SwpResult => {
     const totalInterest = (finalBalance + totalWithdrawn) - initialInvestment;
 
     return { finalBalance, totalWithdrawn, totalInterest, chartData };
+};
+
+
+export const calculateEmi = (input: EmiInput): EmiResult => {
+    const { amount, rate, tenure } = input;
+    if (amount <= 0 || rate <= 0 || tenure <= 0) {
+        return { monthlyEmi: 0, totalInterest: 0, totalPayment: 0, amortization: [] };
+    }
+
+    const principal = amount;
+    const monthlyRate = rate / 100 / 12;
+    const numberOfMonths = tenure * 12;
+
+    const monthlyEmi =
+        (principal * monthlyRate * Math.pow(1 + monthlyRate, numberOfMonths)) /
+        (Math.pow(1 + monthlyRate, numberOfMonths) - 1);
+
+    const totalPayment = monthlyEmi * numberOfMonths;
+    const totalInterest = totalPayment - principal;
+
+    const amortization: AmortizationData[] = [];
+    let balance = principal;
+
+    for (let month = 1; month <= numberOfMonths; month++) {
+        const interestPaid = balance * monthlyRate;
+        const principalPaid = monthlyEmi - interestPaid;
+        balance -= principalPaid;
+
+        amortization.push({
+            month,
+            principal: principalPaid,
+            interest: interestPaid,
+            totalPayment: monthlyEmi,
+            balance: balance > 0 ? balance : 0,
+        });
+    }
+
+    return { 
+        monthlyEmi: isFinite(monthlyEmi) ? monthlyEmi : 0,
+        totalInterest: isFinite(totalInterest) ? totalInterest : 0,
+        totalPayment: isFinite(totalPayment) ? totalPayment : 0,
+        amortization 
+    };
 };

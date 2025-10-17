@@ -1,15 +1,20 @@
-
 import { CalculatorType } from './types';
 import type { IconName } from './components/ui/Icon';
 
-interface CalculatorInfo {
+interface FeatureInfo {
     id: CalculatorType;
     name: string;
     description: string;
     icon: IconName;
 }
 
-export const CALCULATORS: CalculatorInfo[] = [
+export const FEATURES: FeatureInfo[] = [
+     {
+        id: CalculatorType.PORTFOLIO,
+        name: 'Portfolio Tracker',
+        description: 'Track your stocks and mutual funds in real-time.',
+        icon: 'portfolio',
+    },
     {
         id: CalculatorType.FD,
         name: 'FD Calculator',
@@ -39,5 +44,11 @@ export const CALCULATORS: CalculatorInfo[] = [
         name: 'SWP Calculator',
         description: 'Plan your Systematic Withdrawal Plan for regular income.',
         icon: 'swp',
+    },
+    {
+        id: CalculatorType.EMI,
+        name: 'EMI Calculator',
+        description: 'Calculate your Equated Monthly Instalment for loans.',
+        icon: 'emi',
     },
 ];

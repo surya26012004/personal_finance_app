@@ -2,7 +2,7 @@
 import React from 'react';
 // FIX: Import Variants type from framer-motion to resolve type error.
 import { motion, Variants } from 'framer-motion';
-import { CALCULATORS } from '../constants';
+import { FEATURES } from '../constants';
 import { CalculatorType } from '../types';
 import { Card } from './ui/Card';
 import { Icon } from './ui/Icon';
@@ -11,7 +11,8 @@ interface DashboardProps {
     onSelectCalculator: (calculator: CalculatorType) => void;
 }
 
-const containerVariants = {
+// FIX: Add explicit Variants type to ensure correct type checking.
+const containerVariants: Variants = {
     hidden: { opacity: 0 },
     visible: {
         opacity: 1,
@@ -51,7 +52,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelectCalculator }) => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.1 }}
             >
-                Select a calculator to get started. All your inputs are saved locally for your convenience.
+                Select a tool to get started. All your inputs are saved locally for your convenience.
             </motion.p>
 
             <motion.div
@@ -60,21 +61,21 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelectCalculator }) => {
                 initial="hidden"
                 animate="visible"
             >
-                {CALCULATORS.map((calc) => (
-                    <motion.div key={calc.id} variants={itemVariants}>
+                {FEATURES.map((feature) => (
+                    <motion.div key={feature.id} variants={itemVariants}>
                         <Card
                             className="text-left h-full cursor-pointer group"
-                            onClick={() => onSelectCalculator(calc.id)}
+                            onClick={() => onSelectCalculator(feature.id)}
                         >
                             <div className="flex items-center gap-4 mb-3">
                                 <div className="p-3 bg-primary-light/10 dark:bg-primary-dark/20 rounded-lg">
-                                    <Icon name={calc.icon} className="w-6 h-6 text-primary-light dark:text-primary-dark" />
+                                    <Icon name={feature.icon} className="w-6 h-6 text-primary-light dark:text-primary-dark" />
                                 </div>
-                                <h3 className="text-xl font-semibold text-text-primary-light dark:text-text-primary-dark">{calc.name}</h3>
+                                <h3 className="text-xl font-semibold text-text-primary-light dark:text-text-primary-dark">{feature.name}</h3>
                             </div>
-                            <p className="text-text-secondary-light dark:text-text-secondary-dark flex-grow">{calc.description}</p>
+                            <p className="text-text-secondary-light dark:text-text-secondary-dark flex-grow">{feature.description}</p>
                             <div className="mt-4 text-primary-light dark:text-primary-dark font-medium flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                Open Calculator <span className="transform group-hover:translate-x-1 transition-transform">&rarr;</span>
+                                Open Tool <span className="transform group-hover:translate-x-1 transition-transform">&rarr;</span>
                             </div>
                         </Card>
                     </motion.div>
