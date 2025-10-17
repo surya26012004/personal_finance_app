@@ -202,40 +202,36 @@ export const searchAssets = async (query: string): Promise<AssetSearchResult[]> 
             .map(asset => ({ id: asset.id, name: asset.name, type: asset.type }));
     }
 
-    try {
-        const results: AssetSearchResult[] = [];
+    const stockPromise = fetch(`${FINNHUB_API_BASE_URL}/search?q=${query}&token=${FINNHUB_API_KEY}`).then(res => res.json());
+    const mfPromise = fetch(`${MF_API_BASE_URL}/mf/search?q=${query}`).then(res => res.ok ? res.json() : []);
 
-        // Search Finnhub for stocks
-        const stockEndpoint = `${FINNHUB_API_BASE_URL}/search?q=${query}&token=${FINNHUB_API_KEY}`;
-        const stockRes = await fetch(stockEndpoint);
-        const stockData = await stockRes.json();
-        if (stockData.result) {
-            results.push(...stockData.result
-                .filter((item: any) => item.symbol.includes('.NS')) // Filter for Indian stocks
-                .map((item: any) => ({
-                    id: item.symbol.replace('.NS', ''),
-                    name: item.description,
-                    type: 'STOCK' as AssetType,
-                }))
-            );
-        }
+    const [stockResult, mfResult] = await Promise.allSettled([stockPromise, mfPromise]);
+    
+    const combinedResults: AssetSearchResult[] = [];
 
-        // Search MF API for mutual funds
-        const mfEndpoint = `https://api.mfapi.in/mf/search?q=${query}`;
-        const mfRes = await fetch(mfEndpoint);
-        const mfData = await mfRes.json();
-        if (mfData) {
-            results.push(...mfData.map((item: any) => ({ 
-                id: item.schemeCode.toString(), 
-                name: item.schemeName, 
-                type: 'MUTUAL_FUND' as AssetType 
-            })));
-        }
-        
-        return results.slice(0, 10); // Limit results
-
-    } catch (error) {
-        console.error("Failed to search assets:", error);
-        return [];
+    if (stockResult.status === 'fulfilled' && stockResult.value.result) {
+        const stockData = stockResult.value.result
+            .filter((item: any) => item.symbol.includes('.NS'))
+            .map((item: any) => ({
+                id: item.symbol.replace('.NS', ''),
+                name: item.description,
+                type: 'STOCK' as AssetType,
+            }));
+        combinedResults.push(...stockData);
+    } else if (stockResult.status === 'rejected') {
+        console.error('Stock search failed:', stockResult.reason);
     }
+
+    if (mfResult.status === 'fulfilled' && Array.isArray(mfResult.value)) {
+        const mfData = mfResult.value.map((item: any) => ({
+            id: item.schemeCode.toString(),
+            name: item.schemeName,
+            type: 'MUTUAL_FUND' as AssetType,
+        }));
+        combinedResults.push(...mfData);
+    } else if (mfResult.status === 'rejected') {
+        console.error('Mutual fund search failed:', mfResult.reason);
+    }
+
+    return combinedResults.slice(0, 10);
 };

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import useLocalStorage from '../../hooks/useLocalStorage';
 import { getMarketData } from '../../utils/marketData';
-import { PortfolioAsset, WatchlistItem, MarketData } from '../../types';
+import { PortfolioAsset, WatchlistItem, MarketData, AssetDetails } from '../../types';
 import AssetDetailView from './AssetDetailView';
 import PortfolioOverview from './PortfolioOverview';
 import PortfolioHoldings from './PortfolioHoldings';
@@ -34,6 +34,7 @@ const PortfolioTracker: React.FC = () => {
     
     const [marketData, setMarketData] = useState<Record<string, MarketData>>({});
     const [isLoading, setIsLoading] = useState(true);
+    const [detailsCache, setDetailsCache] = useState<Record<string, AssetDetails>>({});
 
     useEffect(() => {
         const fetchMarketData = async () => {
@@ -47,6 +48,10 @@ const PortfolioTracker: React.FC = () => {
         };
         fetchMarketData();
     }, [portfolio, watchlist]);
+
+    const updateDetailsCache = useCallback((assetId: string, details: AssetDetails) => {
+        setDetailsCache(prev => ({ ...prev, [assetId]: details }));
+    }, []);
 
     const handleSelectAsset = useCallback((asset: PortfolioAsset | WatchlistItem) => setSelectedAsset(asset), []);
     const handleBack = useCallback(() => setSelectedAsset(null), []);
@@ -113,7 +118,13 @@ const PortfolioTracker: React.FC = () => {
             <AnimatePresence mode="wait">
                 {selectedAsset ? (
                     <motion.div key="detail" initial="hidden" animate="visible" exit="exit" variants={pageVariants}>
-                        <AssetDetailView asset={selectedAsset} marketData={marketData[selectedAsset.id]} onBack={handleBack} />
+                        <AssetDetailView 
+                            asset={selectedAsset} 
+                            marketData={marketData[selectedAsset.id]} 
+                            onBack={handleBack} 
+                            cache={detailsCache}
+                            onCacheUpdate={updateDetailsCache}
+                        />
                     </motion.div>
                 ) : (
                     <motion.div key="list" initial="hidden" animate="visible" exit="exit" variants={pageVariants}>

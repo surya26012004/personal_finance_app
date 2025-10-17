@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PortfolioAsset, StockAsset, MutualFundAsset, AssetType, AssetSearchResult } from '../../types';
@@ -38,7 +39,7 @@ const AssetForm: React.FC<AssetFormProps> = ({ isOpen, onClose, onSave, assetToE
 
     // Debounced search effect
     useEffect(() => {
-        if (searchQuery.length < 3) {
+        if (searchQuery.length < 2) {
             setSearchResults([]);
             return;
         }
@@ -68,16 +69,34 @@ const AssetForm: React.FC<AssetFormProps> = ({ isOpen, onClose, onSave, assetToE
     const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { value } = e.target;
         setSearchQuery(value);
-        setFormData(prev => ({ ...prev, name: value }));
+        setFormData(prev => ({ ...prev, name: value, id: '' })); // Clear ID when search query changes
     };
     
     const handleSelectSearchResult = (result: AssetSearchResult) => {
-        setFormData(prev => ({
-            ...prev,
-            id: result.id,
-            name: result.name,
-            type: result.type,
-        }));
+        const { quantity, avgPrice } = formData;
+        let newFormData: Partial<PortfolioAsset>;
+
+        if (result.type === 'STOCK') {
+            newFormData = {
+                ...emptyStock,
+                id: result.id,
+                name: result.name,
+                sector: '', // Let user fill this.
+            };
+        } else { // MUTUAL_FUND
+            newFormData = {
+                ...emptyMf,
+                id: result.id,
+                name: result.name,
+                category: 'Equity', // Default
+            };
+        }
+
+        // Preserve quantity and avgPrice if they exist
+        newFormData.quantity = quantity || 0;
+        newFormData.avgPrice = avgPrice || 0;
+
+        setFormData(newFormData);
         setAssetType(result.type);
         setSearchQuery(result.name);
         setSearchResults([]);

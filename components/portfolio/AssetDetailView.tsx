@@ -11,6 +11,8 @@ interface AssetDetailViewProps {
     asset: PortfolioAsset | WatchlistItem;
     marketData: MarketData | undefined;
     onBack: () => void;
+    cache: Record<string, AssetDetails>;
+    onCacheUpdate: (assetId: string, details: AssetDetails) => void;
 }
 
 const CustomTooltip: React.FC<any> = ({ active, payload, label }) => {
@@ -25,7 +27,7 @@ const CustomTooltip: React.FC<any> = ({ active, payload, label }) => {
     return null;
 };
 
-const AssetDetailView: React.FC<AssetDetailViewProps> = ({ asset, marketData, onBack }) => {
+const AssetDetailView: React.FC<AssetDetailViewProps> = ({ asset, marketData, onBack, cache, onCacheUpdate }) => {
     const { theme } = useTheme();
     const [timeRange, setTimeRange] = useState('1Y');
     const [details, setDetails] = useState<AssetDetails | null>(null);
@@ -33,13 +35,23 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ asset, marketData, on
 
     useEffect(() => {
         const fetchDetails = async () => {
+            const cachedDetails = cache[asset.id];
+            if (cachedDetails) {
+                setDetails(cachedDetails);
+                setIsLoading(false);
+                return;
+            }
+
             setIsLoading(true);
             const fetchedDetails = await getAssetDetails(asset.id, asset.type);
+            if (fetchedDetails) {
+                onCacheUpdate(asset.id, fetchedDetails);
+            }
             setDetails(fetchedDetails);
             setIsLoading(false);
         };
         fetchDetails();
-    }, [asset]);
+    }, [asset, cache, onCacheUpdate]);
 
     if (isLoading) {
         return <div className="text-center py-20">Loading asset details...</div>;
