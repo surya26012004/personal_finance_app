@@ -1,3 +1,4 @@
+
 import type {
     AssetDetails,
     AssetSearchResult,
@@ -12,21 +13,31 @@ import type {
 // ===================================================================================
 // LIVE DATA INTEGRATION - ACTION REQUIRED
 // ===================================================================================
-// 1. Replace the placeholders below with your actual API keys and URLs.
-// 2. Update the `fetch` calls and data parsing logic to match your specific API documentation.
-//
-// IMPORTANT: For security, use environment variables in a real-world application
-// instead of hardcoding keys directly in the source code.
+// 1. Go to finnhub.io, sign up for a free account, and get your API key.
+// 2. Paste your API key below to enable live stock market data.
 // ===================================================================================
 
-const UPSTOX_API_KEY = 'YOUR_UPSTOX_API_KEY';
-const UPSTOX_API_BASE_URL = 'https://api.upstox.com/v2'; // Hypothetical URL
+const FINNHUB_API_KEY = 'd3p7johr01qt2em62i90d3p7johr01qt2em62i9g'; // <-- PASTE YOUR KEY HERE
+const FINNHUB_API_BASE_URL = 'https://finnhub.io/api/v1';
 
 const MF_API_BASE_URL = 'https://api.mfapi.in'; // Real Free Mutual Fund API
 
+// --- Helper to generate mock chart data for details view ---
+const generateMockChartData = (base: number) => {
+    const data: { date: string, value: number }[] = [];
+    let current = base;
+    for (let i = 0; i < 365 * 5; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() - (365 * 5 - i));
+        current *= 1 + (Math.random() - 0.49) * 0.02;
+        data.push({ date: date.toISOString().split('T')[0], value: parseFloat(current.toFixed(2)) });
+    }
+    return { '1M': data.slice(-30), '6M': data.slice(-180), '1Y': data.slice(-365), '5Y': data };
+};
+
+
 // --- MOCK DATA (For Fallback) ---
 
-// FIX: Add `id` to the type definition for MOCK_ASSETS values to match the object shape.
 const MOCK_ASSETS: Record<string, (StockDetails | MutualFundDetails) & { id: string; name: string; type: AssetType; }> = {
     'RELIANCE': { id: 'RELIANCE', name: 'Reliance Industries Ltd', type: 'STOCK', marketCap: 20000000000000, peRatio: 28.5, week52High: 3024, week52Low: 2220, sector: 'Energy' },
     'HDFCBANK': { id: 'HDFCBANK', name: 'HDFC Bank Ltd', type: 'STOCK', marketCap: 12000000000000, peRatio: 20.1, week52High: 1757, week52Low: 1363, sector: 'Financials' },
@@ -50,45 +61,30 @@ const MOCK_MARKET_DATA: Record<string, MarketData> = {
  * Fetches real-time market data for a list of assets from their respective APIs.
  */
 export const getMarketData = async (assets: (PortfolioAsset | WatchlistItem)[]): Promise<Record<string, MarketData>> => {
-    const useMock = UPSTOX_API_KEY.startsWith('YOUR_');
-    const assetIds = assets.map(a => a.id);
-
+    const useMock = FINNHUB_API_KEY.startsWith('YOUR_');
     if (useMock || assets.length === 0) {
-        if (!useMock) console.warn("API Key not set. Falling back to MOCK market data.");
+        if (!useMock) console.warn("Finnhub API Key not set. Falling back to MOCK market data.");
+        const assetIds = assets.map(a => a.id);
         return Object.fromEntries(Object.entries(MOCK_MARKET_DATA).filter(([key]) => assetIds.includes(key)));
     }
 
-    const stockAssets = assets.filter(a => a.type === 'STOCK');
-    const mfAssets = assets.filter(a => a.type === 'MUTUAL_FUND');
     const results: Record<string, MarketData> = {};
 
-    try {
-        // --- Fetch Stock Data from Upstox (Hypothetical) ---
-        if (stockAssets.length > 0) {
-            // NOTE: You would need to map your tickers (e.g., 'RELIANCE') to Upstox instrument_key.
-            // This is a simplified example.
-            const stockIds = stockAssets.map(a => `NSE_EQ|${a.id}`).join(',');
-            const endpoint = `${UPSTOX_API_BASE_URL}/market/quotes?instrument_key=${stockIds}`;
-            // const response = await fetch(endpoint, { headers: { 'Authorization': `Bearer ${UPSTOX_API_KEY}` } });
-            // const data = await response.json();
-            // for (const key in data.data) {
-            //     const quote = data.data[key];
-            //     const ticker = key.split('|')[1];
-            //     results[ticker] = {
-            //         currentPrice: quote.last_price,
-            //         dayChange: quote.change,
-            //         dayChangePercent: (quote.change / (quote.last_price - quote.change)) * 100
-            //     };
-            // }
-            // For demo, using mock data
-            stockAssets.forEach(asset => {
-                if (MOCK_MARKET_DATA[asset.id]) results[asset.id] = MOCK_MARKET_DATA[asset.id];
-            })
-        }
-
-        // --- Fetch Mutual Fund NAVs from MF API ---
-        if (mfAssets.length > 0) {
-            const promises = mfAssets.map(async (asset) => {
+    const apiCalls = assets.map(async (asset) => {
+        try {
+            if (asset.type === 'STOCK') {
+                const ticker = `${asset.id}.NS`; // Append .NS for NSE stocks
+                const endpoint = `${FINNHUB_API_BASE_URL}/quote?symbol=${ticker}&token=${FINNHUB_API_KEY}`;
+                const response = await fetch(endpoint);
+                const data = await response.json();
+                if (data.c) { // 'c' is current price in Finnhub response
+                    results[asset.id] = {
+                        currentPrice: data.c,
+                        dayChange: data.d,
+                        dayChangePercent: data.dp,
+                    };
+                }
+            } else if (asset.type === 'MUTUAL_FUND') {
                 const endpoint = `${MF_API_BASE_URL}/mf/${asset.id}`;
                 const response = await fetch(endpoint);
                 const data = await response.json();
@@ -101,22 +97,25 @@ export const getMarketData = async (assets: (PortfolioAsset | WatchlistItem)[]):
                     dayChange: dayChange,
                     dayChangePercent: dayChangePercent
                 };
-            });
-            await Promise.all(promises);
+            }
+        } catch (error) {
+            console.error(`Failed to fetch data for ${asset.id}:`, error);
+            // Fallback to mock data for the failed asset
+            if (MOCK_MARKET_DATA[asset.id]) {
+                results[asset.id] = MOCK_MARKET_DATA[asset.id];
+            }
         }
+    });
 
-        return results;
-    } catch (error) {
-        console.error("Failed to fetch live market data:", error);
-        return {}; // Return empty on error
-    }
+    await Promise.all(apiCalls);
+    return results;
 };
 
 /**
  * Fetches detailed information for a single asset.
  */
 export const getAssetDetails = async (assetId: string, assetType: AssetType): Promise<AssetDetails | null> => {
-    const useMock = UPSTOX_API_KEY.startsWith('YOUR_');
+    const useMock = FINNHUB_API_KEY.startsWith('YOUR_');
     if (useMock) {
         console.warn(`API Key not set. Falling back to MOCK asset details for ${assetId}.`);
         const assetInfo = MOCK_ASSETS[assetId];
@@ -124,38 +123,45 @@ export const getAssetDetails = async (assetId: string, assetType: AssetType): Pr
 
         const marketData = MOCK_MARKET_DATA[assetId];
         const basePrice = marketData ? marketData.currentPrice : 1000;
-        
-        const generateChartData = (base: number) => {
-            const data: { date: string, value: number }[] = [];
-            let current = base;
-            for (let i = 0; i < 365 * 5; i++) {
-                const date = new Date();
-                date.setDate(date.getDate() - (365 * 5 - i));
-                current *= 1 + (Math.random() - 0.49) * 0.02;
-                data.push({ date: date.toISOString().split('T')[0], value: parseFloat(current.toFixed(2)) });
-            }
-            return { '1M': data.slice(-30), '6M': data.slice(-180), '1Y': data.slice(-365), '5Y': data };
-        };
 
-        return { ...assetInfo, chartData: generateChartData(basePrice) } as AssetDetails;
+        return { ...assetInfo, chartData: generateMockChartData(basePrice) } as AssetDetails;
     }
 
     try {
-        // --- LIVE API IMPLEMENTATION EXAMPLE ---
         let details: Partial<AssetDetails>;
         if (assetType === 'STOCK') {
-            // Call Upstox API for profile, fundamentals, and historical chart data
-            // const profileEndpoint = `${UPSTOX_API_BASE_URL}/instruments/NSE_EQ|${assetId}`;
-            // ... fetch and parse data
-            details = { ...MOCK_ASSETS[assetId] as StockDetails, type: 'STOCK' };
-        } else { // MUTUAL_FUND
-            // Call MF API for scheme details and historical NAV data
-            const detailsEndpoint = `${MF_API_BASE_URL}/mf/${assetId}`;
-            const [detailsResponse] = await Promise.all([fetch(detailsEndpoint)]);
-            const detailsData = await detailsResponse.json();
+            // NOTE: Finnhub free tier does not provide deep fundamentals like P/E, MarketCap.
+            // We will fetch what we can and use mock data for the rest to keep UI consistent.
+            const ticker = `${assetId}.NS`;
+            const profileEndpoint = `${FINNHUB_API_BASE_URL}/stock/profile2?symbol=${ticker}&token=${FINNHUB_API_KEY}`;
+            const profileRes = await fetch(profileEndpoint);
+            const profileData = await profileRes.json();
+            
+            // For chart data, we'll use mock generator as historical data can be complex.
+            const basePrice = MOCK_MARKET_DATA[assetId]?.currentPrice || profileData.shareOutstanding * profileData.marketCapitalization || 1000;
+            // FIX: The type of mockDetails needs to include the `name` property, which is present in MOCK_ASSETS but not in the base StockDetails type.
+            const mockDetails = MOCK_ASSETS[assetId] as StockDetails & { name: string };
 
+            details = {
+                id: assetId,
+                name: profileData.name || mockDetails.name,
+                type: 'STOCK',
+                marketCap: profileData.marketCapitalization * 1000000 || mockDetails.marketCap, // Convert from millions
+                sector: profileData.finnhubIndustry || mockDetails.sector,
+                peRatio: mockDetails.peRatio, // Not in free tier
+                week52High: mockDetails.week52High, // Not in free tier
+                week52Low: mockDetails.week52Low,   // Not in free tier
+                chartData: generateMockChartData(basePrice) // Using a placeholder
+            };
+
+        } else { // MUTUAL_FUND
+            const detailsEndpoint = `${MF_API_BASE_URL}/mf/${assetId}`;
+            const detailsResponse = await fetch(detailsEndpoint);
+            const detailsData = await detailsResponse.json();
+            
+            // Take the last 5 years of NAV data for the chart
             const chartPoints = detailsData.data.slice(0, 365 * 5).reverse();
-             const chartData = {
+            const chartData = {
                 '1M': chartPoints.slice(-30).map((d: any) => ({ date: d.date, value: parseFloat(d.nav) })),
                 '6M': chartPoints.slice(-180).map((d: any) => ({ date: d.date, value: parseFloat(d.nav) })),
                 '1Y': chartPoints.slice(-365).map((d: any) => ({ date: d.date, value: parseFloat(d.nav) })),
@@ -167,7 +173,7 @@ export const getAssetDetails = async (assetId: string, assetType: AssetType): Pr
                 name: detailsData.meta.scheme_name,
                 type: 'MUTUAL_FUND',
                 nav: parseFloat(detailsData.data[0].nav),
-                category: detailsData.meta.scheme_category,
+                category: detailsData.meta.scheme_category as any,
                 aum: 0, // AUM not provided by this API
                 expenseRatio: 0, // Expense ratio not provided
                 chartData,
@@ -186,7 +192,7 @@ export const getAssetDetails = async (assetId: string, assetType: AssetType): Pr
 export const searchAssets = async (query: string): Promise<AssetSearchResult[]> => {
     if (!query) return [];
     
-    const useMock = UPSTOX_API_KEY.startsWith('YOUR_');
+    const useMock = FINNHUB_API_KEY.startsWith('YOUR_');
      if (useMock) {
         return Object.values(MOCK_ASSETS)
             .filter(asset => 
@@ -199,21 +205,34 @@ export const searchAssets = async (query: string): Promise<AssetSearchResult[]> 
     try {
         const results: AssetSearchResult[] = [];
 
-        // Search Upstox for stocks (Hypothetical)
-        // const upstoxEndpoint = `${UPSTOX_API_BASE_URL}/search?query=${query}`;
-        // const stockRes = await fetch(upstoxEndpoint, { headers: { ... } });
-        // const stockData = await stockRes.json();
-        // results.push(...stockData.data.map(item => ({ id: item.tradingsymbol, name: item.name, type: 'STOCK' })));
+        // Search Finnhub for stocks
+        const stockEndpoint = `${FINNHUB_API_BASE_URL}/search?q=${query}&token=${FINNHUB_API_KEY}`;
+        const stockRes = await fetch(stockEndpoint);
+        const stockData = await stockRes.json();
+        if (stockData.result) {
+            results.push(...stockData.result
+                .filter((item: any) => item.symbol.includes('.NS')) // Filter for Indian stocks
+                .map((item: any) => ({
+                    id: item.symbol.replace('.NS', ''),
+                    name: item.description,
+                    type: 'STOCK' as AssetType,
+                }))
+            );
+        }
 
         // Search MF API for mutual funds
         const mfEndpoint = `https://api.mfapi.in/mf/search?q=${query}`;
         const mfRes = await fetch(mfEndpoint);
         const mfData = await mfRes.json();
         if (mfData) {
-            results.push(...mfData.map((item: any) => ({ id: item.schemeCode.toString(), name: item.schemeName, type: 'MUTUAL_FUND' })));
+            results.push(...mfData.map((item: any) => ({ 
+                id: item.schemeCode.toString(), 
+                name: item.schemeName, 
+                type: 'MUTUAL_FUND' as AssetType 
+            })));
         }
         
-        return results;
+        return results.slice(0, 10); // Limit results
 
     } catch (error) {
         console.error("Failed to search assets:", error);
